@@ -25,10 +25,10 @@
         <div id='map' class='w-full h-full'></div>
         <div id='time-slider' class='w180 bg-white absolute top right mt18 mr18 round shadow-darken10 px12 py12 txt-s'>
             <label id="year"></label>
-            <input id="slider" type="range" min="0" max="11" step="1" value="0" />
+            <input id="slider" type="range" min="2010" max="2018" step="1" value="0" />
         </div>
         <div id='legend' class='w180 bg-white absolute top left mt18 mr18 round shadow-darken10 px12 py12 txt-s'>
-            <strong class='block mb6 txt-l'>Magnitude</strong>
+            <strong class='block mb6 txt-l'>Magnitude, Fujita Scale</strong>
             <ul class='ul mb6'></ul>
         </div>
     </div>
@@ -70,19 +70,19 @@
         5: "#7c1d6f"
     }
 
-    function filterBy(year) {
-        var filters = ['==', 'year', year];
-        map.setFilter('tornado-paths', filters);
-        // map.setFilter('earthquake-labels', filters);
-        
-        // Set the label to the year
-        document.getElementById('year').textContent = years[year];
+    var labelCodes = {
+        1: "F1: 73–112 mph winds, moderate damage",
+        2: "F2: 113–157 mph winds, considerable damage",
+        3: "F3: 158–206 mph winds, severe damage",
+        4: "F4: 207–260 mph winds, devastating damage",
+        5: "F5: 261–318 mph winds, incredible damage"
     }
 
     map.on('load', function() {
         d3.json('data/tornadoes-1-5.json').then(geojson => {
             console.log(geojson);
             addLayer(geojson);
+            addLegend(geojson);
         });
     });
 
@@ -112,6 +112,33 @@
                 "line-cap": "round"
             }
         });
+
+        // set intial filter to 2010
+        filterBy(2010);
+
+        document
+            .getElementById('slider')
+            .addEventListener('input', function(e) {
+                var year = parseInt(e.target.value);
+                filterBy(year);
+            });
+    }
+
+    function filterBy(year) {
+        var filters = ['==', 'yr', year];
+        map.setFilter('tornado-paths', filters);
+        // map.setFilter('earthquake-labels', filters);
+        
+        // Set the label to the year
+        document.getElementById('year').textContent = years[year];
+    }
+
+    function addLegend(geojson) {
+        var listItems = '';
+        for(var code in colorCodes) {
+            listItems += "<li class='li h-full txt-m'><span class='w24 h18 mt6 fl mr12' style='background:" + colorCodes[code] +"'></span>" + labelCodes[code] + "</li>"
+        }
+        d3.select("#legend ul").html(listItems);
     }
 
 </script>
