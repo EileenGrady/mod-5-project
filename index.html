@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8' />
+  <title>Tornadoes</title>
+  <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+  <link href="https://api.mapbox.com/mapbox-assembly/v0.24.0/assembly.min.css" rel="stylesheet">
+  <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.1/mapbox-gl.css' rel='stylesheet' />
+
+    <style>
+        body {
+            margin:0;
+            padding:0;
+        }
+    </style>
+</head>
+<body>
+
+<div class='grid bg-gray-dark absolute h-full w-full'>
+    <div class='col col--12 border-b border--white color-white'>
+        <h1 class='txt-h2 mx36 my24 inline-block'>Tornadoes</h1>
+        <p class='fr mr24 mt36'>Source: <a class='link' target='_blank' href='https://www.spc.noaa.gov/gis/svrgis/'>NOAA Storm Prediction Center</a></p>
+    </div>
+    <div class='col col--12 h-full relative'>
+        <div id='map' class='w-full h-full'></div>
+        <div id='time-slider' class='w180 bg-white absolute top right mt18 mr18 round shadow-darken10 px12 py12 txt-s'>
+            <label id="year"></label>
+            <input id="slider" type="range" min="0" max="11" step="1" value="0" />
+        </div>
+        <div id='legend' class='w180 bg-white absolute top left mt18 mr18 round shadow-darken10 px12 py12 txt-s'>
+            <strong class='block mb6 txt-l'>Magnitude</strong>
+            <ul class='ul mb6'></ul>
+        </div>
+    </div>
+</div>
+
+<script async defer src="https://api.mapbox.com/mapbox-assembly/v0.24.0/assembly.js"></script>
+<script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.1/mapbox-gl.js'></script>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script>
+    // access token
+    mapboxgl.accessToken = 'pk.eyJ1IjoiZWlsZWVuZ3JhZHkiLCJhIjoiY2pvNG00eXVjMDFlcjNxcW1yZ3I2OTJ2ZSJ9.l2EtBykdOJSCNiszd2NbaA';
+
+    // create a new map
+    var map = new mapboxgl.Map({
+        container: 'map', // container id
+        style: 'mapbox://styles/mapbox/dark-v9', // stylesheet location
+        center: [2.28, 11.77], // starting position [lng, lat]
+        zoom: 1.2 // starting zoom
+    });
+
+     
+    var years = [
+        '2010',
+        '2011',
+        '2012',
+        '2013',
+        '2014',
+        '2015',
+        '2016',
+        '2017',
+        '2018'
+    ];
+
+    var colorCodes = {
+        1: "#fcde9c",
+        2: "#f58670",
+        3: "#e34f6f",
+        4: "#d72d7c",
+        5: "#7c1d6f"
+    }
+
+    function filterBy(year) {
+        var filters = ['==', 'year', year];
+        map.setFilter('tornado-paths', filters);
+        // map.setFilter('earthquake-labels', filters);
+        
+        // Set the label to the year
+        document.getElementById('year').textContent = years[year];
+    }
+
+    map.on('load', function() {
+        d3.json('data/tornadoes-1-5.json').then(geojson => {
+            console.log(geojson);
+            addLayer(geojson);
+        });
+    });
+
+    function addLayer(geojson) {
+        map.addLayer({
+            'id': 'tornado-paths',
+            'type': 'line',
+            'source': {
+                'type': 'geojson',
+                'data': geojson // use the data as the data source
+            },
+            'paint': {
+                "line-color": [
+                    "match",
+                    ["number", ["get", "mag"]],
+                    1, colorCodes[1],
+                    2, colorCodes[2],
+                    3, colorCodes[3],
+                    4, colorCodes[4],
+                    5, colorCodes[5],
+                    "#000000"
+                ],
+                "line-opacity": 1,
+                "line-width": 2
+            },
+            'layout': {
+                "line-cap": "round"
+            }
+        });
+    }
+
+</script>
+
+</body>
+</html>
