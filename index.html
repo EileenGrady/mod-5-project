@@ -6,12 +6,14 @@
   <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
   <link href="https://api.mapbox.com/mapbox-assembly/v0.24.0/assembly.min.css" rel="stylesheet">
   <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.1/mapbox-gl.css' rel='stylesheet' />
+  
 
     <style>
         body {
             margin:0;
             padding:0;
         }
+        
     </style>
 </head>
 <body>
@@ -40,6 +42,7 @@
 <script src="https://npmcdn.com/@turf/turf/turf.min.js"></script>
 
 <script>
+
     // access token
     mapboxgl.accessToken = 'pk.eyJ1IjoiZWlsZWVuZ3JhZHkiLCJhIjoiY2pvNG00eXVjMDFlcjNxcW1yZ3I2OTJ2ZSJ9.l2EtBykdOJSCNiszd2NbaA';
 
@@ -78,6 +81,8 @@
         4: "F4: 207–260 mph winds, devastating damage",
         5: "F5: 261–318 mph winds, incredible damage"
     }
+
+    var arrowUrl = 'images/arrow-1.png'
 
     var hoveredPathId = null;
 
@@ -128,8 +133,41 @@
             }
         });
 
+        map.loadImage('images/arrow.png', function(err, image) {
+            if (err) throw error;
+            map.addImage('arrow', image, {
+                'sdf': 'true'
+            });
+        //     map.addLayer({
+        //         'id': 'arrowId',
+        //         'type': 'symbol',
+        //         'source': 'tornados',
+        //         'layout': {
+        //             'symbol-placement': 'line',
+        //             'symbol-spacing': 1,
+        //             'icon-allow-overlap': true,
+        //             // 'icon-ignore-placement': true,
+        //             'icon-image': 'arrow',
+        //             'icon-size': 0.06,
+        //             'visibility': 'visible'
+        //         },
+        //         'paint': {
+        //             "icon-color": "#7c1d6f"
+        //             // [
+        //             //     "match",
+        //             //     ["number", ["get", "mag"]],
+        //             //     1, colorCodes[1],
+        //             //     2, colorCodes[2],
+        //             //     3, colorCodes[3],
+        //             //     4, colorCodes[4],
+        //             //     5, colorCodes[5],
+        //             //     "#000000"
+        //             // ],
+        //         }
+        //     });
+        });
+
         map.on('mousemove', 'tornado-paths', function(e) {
-            console.log(e.features[0]);
             if (e.features.length > 0) {
                 if (hoveredPathId) {
                     map.setFeatureState(
@@ -183,37 +221,304 @@
         d3.select("#legend ul").html(listItems);
     }
 
-    var coordinates;
-    var startPoint;
-    var endPoint;
-    var brng;
-    var midpoint;
+    // var coordinates;
+    // var startPoint;
+    // var endPoint;
+    // var turfStart;
+    // var turfEnd;
+    // var brng;
+    // var midpoint;
+    // var movePoint;
+    // // var route;
+    // var arc = [];
+    var steps = 30;
+    // var movePointSource;
+    // var movePointLayer;
 
     map.on('click', 'tornado-paths', function(e) {
-        coordinates = [e.features[0].properties.slon, e.features[0].properties.slat];
 
-        startPoint = turf.point([e.features[0].properties.slon, e.features[0].properties.slat]);
-        endPoint = turf.point([e.features[0].properties.elon, e.features[0].properties.elat]);
-        console.log(startPoint)
+        var coordinates = [e.features[0].properties.slon, e.features[0].properties.slat];
 
-        brng = turf.bearing(startPoint, endPoint);
+        var turfStart = turf.point([e.features[0].properties.slon, e.features[0].properties.slat]);
+        var turfEnd = turf.point([e.features[0].properties.elon, e.features[0].properties.elat]);
+        // console.log(startPoint)
+
+        var brng = turf.bearing(turfStart, turfEnd);
+
+        var startPoint = [e.features[0].properties.slon, e.features[0].properties.slat];
+        var endPoint = [e.features[0].properties.elon, e.features[0].properties.elat];
 
         var line = turf.lineString(e.features[0].geometry.coordinates)
         var bbox = turf.bbox(line);
-        console.log(bbox);
+        // console.log(bbox);
 
         map.fitBounds(bbox, {
             padding: 40
         });
 
-        map.flyTo({
-            center: coordinates,
-            zoom: 10,
-            pitch: 30,
-            bearing: brng
-        })
+        map.on('moveend', function(e) {
 
-    })
+            var mapLayer = map.getLayer('point');
+
+            if(typeof mapLayer !== 'undefined') {
+                console.log('done');
+                // Remove map layer & source.
+                map.removeLayer('point').removeSource('point');
+            } 
+
+            var movePoint = {
+                'type': 'FeatureCollection',
+                'features': [
+                    {
+                        'type': 'Feature',
+                        'properties': {},
+                        'geometry': {
+                            'type': 'Point',
+                            'coordinates': startPoint
+                        }
+                    }
+                ]
+            };
+
+            var route = {
+                'type': 'FeatureCollection',
+                'features': [
+                    {
+                        'type': 'Feature',
+                        'geometry': {
+                            'type': 'LineString',
+                            'coordinates': [startPoint, endPoint]
+                    }
+                    }
+                ]
+                };
+
+            var options = {units: 'miles'};
+
+            var arc = [];
+
+            var lineDistance = turf.distance(turfStart, turfEnd, options);
+
+            for (var i = 0; i < lineDistance; i += lineDistance / steps) {
+                var segment = turf.along(route.features[0], i, options);
+                arc.push(segment.geometry.coordinates);
+            }
+            
+            route.features[0].geometry.coordinates = arc;
+
+            var counter = 0;
+
+            // if (movePointLayer != undefined) {
+            //     map.removeLayer('point');
+            //     map.removeSource('point');
+            //     console.log('done')
+            // }
+
+            map.addSource('point', {
+                'type': 'geojson',
+                'data': movePoint
+            });
+
+            map.addLayer({
+                'id': 'point',
+                'source': 'point',
+                'type': 'symbol',
+                'layout': {
+                    'icon-image': 'arrow',
+                    'icon-rotate': brng,
+                    'icon-rotation-alignment': 'map',
+                    'icon-allow-overlap': true,
+                    'icon-ignore-placement': true,
+                    'icon-size': 0.06,
+                }
+            });
+
+            // map.flyTo({
+            //     center: coordinates,
+            //     zoom: 10,
+            //     pitch: 30,
+            //     bearing: brng
+            // })
+
+            function animate() {
+            // Update point geometry to a new position based on counter denoting
+            // the index to access the arc.
+            movePoint.features[0].geometry.coordinates =
+            route.features[0].geometry.coordinates[counter];
+            
+            // Calculate the bearing to ensure the icon is rotated to match the route arc
+            // The bearing is calculate between the current point and the next point, except
+            // at the end of the arc use the previous point and the current point
+            // movePoint.features[0].properties.bearing = turf.bearing(
+            // turf.point(
+            // route.features[0].geometry.coordinates[
+            // counter >= steps ? counter - 1 : counter
+            // ]
+            // ),
+            // turf.point(
+            // route.features[0].geometry.coordinates[
+            // counter >= steps ? counter : counter + 1
+            // ]
+            // )
+            // );
+            
+            // Update the source with this new data.
+            map.getSource('point').setData(movePoint);
+            
+            // Request the next frame of animation so long the end has not been reached.
+            if (counter < steps) {
+                requestAnimationFrame(animate);
+            }
+            
+            counter = counter + 1;
+        }
+
+            animate(counter);
+
+        })
+    });
+
+    //     movePoint = {
+    //         'type': 'FeatureCollection',
+    //         'features': [
+    //             {
+    //                 'type': 'Feature',
+    //                 'properties': {},
+    //                 'geometry': {
+    //                     'type': 'Point',
+    //                     'coordinates': startPoint
+    //                 }
+    //             }
+    //         ]
+    //     };
+
+    //     var route = {
+    //         'type': 'FeatureCollection',
+    //         'features': [
+    //             {
+    //                 'type': 'Feature',
+    //                 'geometry': {
+    //                     'type': 'LineString',
+    //                     'coordinates': [[e.features[0].properties.slon, e.features[0].properties.slat], [e.features[0].properties.elon, e.features[0].properties.elat]]
+    //             }
+    //             }
+    //         ]
+    //         };
+    //     console.log(route);
+
+    //     var options = {units: 'miles'};
+
+    //     var lineDistance = turf.distance(startPoint, endPoint, options);
+    //     console.log(lineDistance);
+
+    //     for (var i = 0; i < lineDistance; i += lineDistance / steps) {
+    //         var segment = turf.along(route.features[0], i, options);
+    //         arc.push(segment.geometry.coordinates);
+    //     }
+        
+    //     console.log(arc);
+
+    //     route.features[0].geometry.coordinates = arc;
+
+    //     var counter = 0;
+
+    //     map.addSource('point', {
+    //         'type': 'geojson',
+    //         'data': movePoint
+    //     });
+
+    //     map.addLayer({
+    //         'id': 'point',
+    //         'source': 'point',
+    //         'type': 'symbol',
+    //         'layout': {
+    //             'icon-image': 'arrow',
+    //             'icon-rotate': ['get', 'bearing'],
+    //             'icon-rotation-alignment': 'map',
+    //             'icon-allow-overlap': true,
+    //             'icon-ignore-placement': true,
+    //             'icon-size': 0.06,
+    //         }
+    //     });
+
+    //     // map.flyTo({
+    //     //     center: coordinates,
+    //     //     zoom: 10,
+    //     //     pitch: 30,
+    //     //     bearing: brng
+    //     // })
+
+    //     function animate() {
+    //     // Update point geometry to a new position based on counter denoting
+    //     // the index to access the arc.
+    //     movePoint.features[0].geometry.coordinates =
+    //     route.features[0].geometry.coordinates[counter];
+        
+    //     // Calculate the bearing to ensure the icon is rotated to match the route arc
+    //     // The bearing is calculate between the current point and the next point, except
+    //     // at the end of the arc use the previous point and the current point
+    //     movePoint.features[0].properties.bearing = turf.bearing(
+    //     turf.point(
+    //     route.features[0].geometry.coordinates[
+    //     counter >= steps ? counter - 1 : counter
+    //     ]
+    //     ),
+    //     turf.point(
+    //     route.features[0].geometry.coordinates[
+    //     counter >= steps ? counter : counter + 1
+    //     ]
+    //     )
+    //     );
+        
+    //     // Update the source with this new data.
+    //     map.getSource('point').setData(movePoint);
+        
+    //     // Request the next frame of animation so long the end has not been reached.
+    //     if (counter < steps) {
+    //     requestAnimationFrame(animate);
+    //     }
+        
+    //     counter = counter + 1;
+    // }
+
+
+    //     animate(counter);
+
+    // })
+
+    
+    // function animate() {
+    //     // Update point geometry to a new position based on counter denoting
+    //     // the index to access the arc.
+    //     movePoint.features[0].geometry.coordinates =
+    //     route.features[0].geometry.coordinates[counter];
+        
+    //     // Calculate the bearing to ensure the icon is rotated to match the route arc
+    //     // The bearing is calculate between the current point and the next point, except
+    //     // at the end of the arc use the previous point and the current point
+    //     movePoint.features[0].properties.bearing = turf.bearing(
+    //     turf.point(
+    //     route.features[0].geometry.coordinates[
+    //     counter >= steps ? counter - 1 : counter
+    //     ]
+    //     ),
+    //     turf.point(
+    //     route.features[0].geometry.coordinates[
+    //     counter >= steps ? counter : counter + 1
+    //     ]
+    //     )
+    //     );
+        
+    //     // Update the source with this new data.
+    //     map.getSource('point').setData(movePoint);
+        
+    //     // Request the next frame of animation so long the end has not been reached.
+    //     if (counter < steps) {
+    //     requestAnimationFrame(animate);
+    //     }
+        
+    //     counter = counter + 1;
+    // }
 
 </script>
 
