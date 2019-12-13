@@ -20,17 +20,20 @@
 
 <div class='grid bg-gray-dark absolute h-full w-full'>
     <div class='col col--12 border-b border--white color-white'>
-        <h1 class='txt-h2 mx36 my24 inline-block'>Tornadoes</h1>
+        <h1 class='txt-h2 mx36 my24 inline-block'>Tornado Damage in the US: 2010-2018</h1>
         <p class='fr mr24 mt36'>Source: <a class='link' target='_blank' href='https://www.spc.noaa.gov/gis/svrgis/'>NOAA Storm Prediction Center</a></p>
     </div>
     <div class='col col--12 h-full relative'>
         <div id='map' class='w-full h-full'></div>
-        <div id='time-slider' class='w180 bg-white absolute top right mt18 mr18 round shadow-darken10 px12 py12 txt-s'>
-            <label id="year"></label>
-            <input id="slider" type="range" min="2010" max="2018" step="1" value="0" />
+        <div id='time-slider' class='w180 bg-white absolute top left mt18 ml18 round shadow-darken10 px12 py12 txt-s'>
+                <strong class='block mb6 txt-l'><label id="year"></label></strong>
+            <input id="slider" type="range" min="2010" max="2018" step="1" value="2010" />
         </div>
-        <div id='legend' class='w180 bg-white absolute top left mt18 mr18 round shadow-darken10 px12 py12 txt-s'>
-            <strong class='block mb6 txt-l'>Magnitude, Fujita Scale</strong>
+        <div id='info-box' class='w240 bg-white absolute top right mt18 mr18 round shadow-darken10 px12 py12 txt-s'>
+            <strong class='block mb6 txt-l'>Click any tornado path to learn more.</strong>
+        </div>
+        <div id='legend' class='w180 bg-white absolute top left mt120 ml18 round shadow-darken10 px12 py12 txt-s'>
+            <strong class='block mb6 txt-m'>Enhanced Fujita Scale</strong>
             <ul class='ul mb6'></ul>
         </div>
     </div>
@@ -40,6 +43,15 @@
 <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.1/mapbox-gl.js'></script>
 <script src="https://d3js.org/d3.v5.min.js"></script>
 <script src="https://npmcdn.com/@turf/turf/turf.min.js"></script>
+<!-- <script type="module">
+    import { MapboxGradientBoxControl, MapboxInfoBoxControl } from "/node_modules/mapbox-gl-infobox";
+</script>
+<script type="module">
+    import { Map as MapboxMap } from "/node_modules/mapbox-gl";
+</script>
+<script type="module">
+    import "/node_modules/mapbox-gl-infobox/styles.css";
+</script> -->
 
 <script>
 
@@ -53,6 +65,13 @@
         center: [-99.00419461981159, 39.09686673109556], // starting position [lng, lat]
         zoom: 3.52 // starting zoom
     });
+
+    // map.addControl(new mapboxgl.NavigationControl());
+
+    // map.addControl(new MapboxInfoBoxControl());
+
+    // define initial bounds of map to revert to when time slider changes
+    var initialBounds = [-60.29801479704621, 46.228291513703226, -137.7103744425777, 31.164291511296398]
      
     var years = [
         '2010',
@@ -67,6 +86,7 @@
     ];
 
     var colorCodes = {
+        0: "#85c4c9",
         1: "#fcde9c",
         2: "#f58670",
         3: "#e34f6f",
@@ -75,26 +95,30 @@
     }
 
     var labelCodes = {
-        1: "F1: 73–112 mph winds, moderate damage",
-        2: "F2: 113–157 mph winds, considerable damage",
-        3: "F3: 158–206 mph winds, severe damage",
-        4: "F4: 207–260 mph winds, devastating damage",
-        5: "F5: 261–318 mph winds, incredible damage"
+        0: "EF0",
+        1: "EF1",
+        2: "EF2",
+        3: "EF3",
+        4: "EF4",
+        5: "EF5"
     }
-
-    var arrowUrl = 'images/arrow-1.png'
 
     var hoveredPathId = null;
 
+    var popup = new mapboxgl.Popup({
+        closeButton: false,
+        closeOnClick: false
+    });
+
     map.on('load', function() {
-        d3.json('data/tornadoes-1-5.json').then(geojson => {
+        d3.json('data/tornadoes-filtered.json').then(geojson => {
             addLayer(geojson);
             addLegend(geojson);
         });
     });
 
     function addLayer(geojson) {
-        map.addSource('tornados', {
+        map.addSource('tornadoes', {
             'type': 'geojson',
             'data': geojson,
             'generateId': true
@@ -103,11 +127,12 @@
         map.addLayer({
             'id': 'tornado-paths',
             'type': 'line',
-            'source': 'tornados', // set data source defined above
+            'source': 'tornadoes', // set data source defined above
             'paint': {
                 "line-color": [
                     "match",
                     ["number", ["get", "mag"]],
+                    0, colorCodes[0],
                     1, colorCodes[1],
                     2, colorCodes[2],
                     3, colorCodes[3],
@@ -119,12 +144,12 @@
                     "case",
                     ["boolean", ["feature-state", "hover"], false],
                     1,
-                    0.75
+                    0.85
                 ],
                 "line-width": [
                     "case",
                     ["boolean", ["feature-state", "hover"], false],
-                    5,
+                    6,
                     3
                 ]
             },
@@ -133,60 +158,39 @@
             }
         });
 
-        map.loadImage('images/arrow.png', function(err, image) {
+        map.loadImage('images/tornado.png', function(err, image) {
             if (err) throw error;
-            map.addImage('arrow', image, {
+            map.addImage('tornado', image, {
                 'sdf': 'true'
             });
-        //     map.addLayer({
-        //         'id': 'arrowId',
-        //         'type': 'symbol',
-        //         'source': 'tornados',
-        //         'layout': {
-        //             'symbol-placement': 'line',
-        //             'symbol-spacing': 1,
-        //             'icon-allow-overlap': true,
-        //             // 'icon-ignore-placement': true,
-        //             'icon-image': 'arrow',
-        //             'icon-size': 0.06,
-        //             'visibility': 'visible'
-        //         },
-        //         'paint': {
-        //             "icon-color": "#7c1d6f"
-        //             // [
-        //             //     "match",
-        //             //     ["number", ["get", "mag"]],
-        //             //     1, colorCodes[1],
-        //             //     2, colorCodes[2],
-        //             //     3, colorCodes[3],
-        //             //     4, colorCodes[4],
-        //             //     5, colorCodes[5],
-        //             //     "#000000"
-        //             // ],
-        //         }
-        //     });
         });
 
         map.on('mousemove', 'tornado-paths', function(e) {
+
+            map.getCanvas().style.cursor = 'pointer';
+
             if (e.features.length > 0) {
                 if (hoveredPathId) {
                     map.setFeatureState(
-                    { source: 'tornados', id: hoveredPathId },
+                    { source: 'tornadoes', id: hoveredPathId },
                     { hover: false }
                     );
                 }
                 hoveredPathId = e.features[0].id;
                 map.setFeatureState(
-                    { source: 'tornados', id: hoveredPathId },
+                    { source: 'tornadoes', id: hoveredPathId },
                     { hover: true }
                 );
             }
         });
 
         map.on('mouseleave', 'tornado-paths', function() {
+
+            map.getCanvas().style.cursor = '';
+
             if (hoveredPathId) {
                 map.setFeatureState(
-                    { source: 'tornados', id: hoveredPathId },
+                    { source: 'tornadoes', id: hoveredPathId },
                     { hover: false }
                 );
             }
@@ -199,18 +203,31 @@
         document
             .getElementById('slider')
             .addEventListener('input', function(e) {
+
+                // check if the moving tornado icon exists, and remove it if so
+                var mapLayer = map.getLayer('point');
+                if(typeof mapLayer !== 'undefined') {
+                    // Remove map layer & source.
+                    map.removeLayer('point').removeSource('point');
+                }
+
+                document.getElementById('info-box').innerHTML="<strong class='block mb6 txt-l'>Click any tornado path to learn more.</strong>"
+
+                // revert map to initial bounds
+                map.fitBounds(initialBounds);
+
                 var year = parseInt(e.target.value);
                 filterBy(year);
             });
     }
 
     function filterBy(year) {
+
         var filters = ['==', 'yr', year];
         map.setFilter('tornado-paths', filters);
-        // map.setFilter('earthquake-labels', filters);
         
         // Set the label to the year
-        document.getElementById('year').textContent = years[year];
+        document.getElementById('year').textContent = year;
     }
 
     function addLegend(geojson) {
@@ -221,47 +238,74 @@
         d3.select("#legend ul").html(listItems);
     }
 
-    // var coordinates;
-    // var startPoint;
-    // var endPoint;
-    // var turfStart;
-    // var turfEnd;
-    // var brng;
-    // var midpoint;
-    // var movePoint;
-    // // var route;
-    // var arc = [];
-    var steps = 30;
-    // var movePointSource;
-    // var movePointLayer;
+    var steps = 90;
 
     map.on('click', 'tornado-paths', function(e) {
 
-        var coordinates = [e.features[0].properties.slon, e.features[0].properties.slat];
+        let features = map.queryRenderedFeatures(e.point);
+        console.log(features);
+        let props = e.features[0].properties
+        console.log(e.features[0]);
 
-        var turfStart = turf.point([e.features[0].properties.slon, e.features[0].properties.slat]);
-        var turfEnd = turf.point([e.features[0].properties.elon, e.features[0].properties.elat]);
-        // console.log(startPoint)
+        let windSpeed = getWindSpeed(props.mag)
+        let damage = getDamage(props.mag)
 
-        var brng = turf.bearing(turfStart, turfEnd);
+        let moreDetails = "<strong class='block mb6 txt-l'>Tornado Details</strong>"
+                            +"This tornado struck on " + props.date 
+                            + " and was a magnitude EF" + props.mag 
+                            + " on the Enhanced Fujita Scale. Wind speeds were " + windSpeed 
+                            + " mph, causing " + damage 
+                            + " damage."
+                            + "<li class='li h-full txt-s'>Property Loss: $" + e.features[0].properties.loss + " million</li>"
+                            + "<li class='li h-full txt-s'>Crop Loss: $" + props.closs + " million</li>"
 
-        var startPoint = [e.features[0].properties.slon, e.features[0].properties.slat];
-        var endPoint = [e.features[0].properties.elon, e.features[0].properties.elat];
+        document.getElementById('info-box').innerHTML=moreDetails;
 
-        var line = turf.lineString(e.features[0].geometry.coordinates)
-        var bbox = turf.bbox(line);
-        // console.log(bbox);
+        let coordinates = e.features[0].geometry.coordinates;
 
-        map.fitBounds(bbox, {
-            padding: 40
+        
+        let bounds = coordinates.reduce(function(bounds, coord) {
+            return bounds.extend(coord);
+        }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+
+        // console.log(coordinates)
+
+        map.fitBounds(bounds, {
+            padding: {
+                'bottom': 80,
+                'left': 250,
+                'right': 300,
+                'top': 150
+            }
         });
 
-        map.on('moveend', function(e) {
+        // let coordinates = [e.features[0].properties.slon, e.features[0].properties.slat];
 
-            var mapLayer = map.getLayer('point');
+        let turfStart = turf.point([e.features[0].properties.slon, e.features[0].properties.slat]);
+        let turfEnd = turf.point([e.features[0].properties.elon, e.features[0].properties.elat]);
+
+        // let brng = turf.bearing(turfStart, turfEnd);
+
+        // let startPoint = [e.features[0].properties.slon, e.features[0].properties.slat];
+        // let endPoint = [e.features[0].properties.elon, e.features[0].properties.elat];
+
+        // let line = turf.lineString(e.features[0].geometry.coordinates)
+        // let bbox = turf.bbox(line);
+
+        // map.fitBounds(bbox, {
+            // padding: {
+            //     'bottom': 80,
+            //     'left': 250,
+            //     'right': 300,
+            //     'top': 150
+            // }
+        // });
+
+        map.once('moveend', function(e) {
+
+            let mapLayer = map.getLayer('point');
 
             if(typeof mapLayer !== 'undefined') {
-                console.log('done');
                 // Remove map layer & source.
                 map.removeLayer('point').removeSource('point');
             } 
@@ -274,7 +318,7 @@
                         'properties': {},
                         'geometry': {
                             'type': 'Point',
-                            'coordinates': startPoint
+                            'coordinates': coordinates[0]
                         }
                     }
                 ]
@@ -287,32 +331,32 @@
                         'type': 'Feature',
                         'geometry': {
                             'type': 'LineString',
-                            'coordinates': [startPoint, endPoint]
+                            'coordinates': [coordinates[0], coordinates[1]]
                     }
                     }
                 ]
                 };
 
-            var options = {units: 'miles'};
 
-            var arc = [];
+            let turfStart = turf.point(coordinates[0]);
+            let turfEnd = turf.point(coordinates[1]);
+            // console.log(coordinates[0]);
+            // console.log(coordinates[1]);
 
-            var lineDistance = turf.distance(turfStart, turfEnd, options);
+            let options = {units: 'miles'};
+
+            let arc = [];
+
+            let lineDistance = turf.distance(turfStart, turfEnd, options);
 
             for (var i = 0; i < lineDistance; i += lineDistance / steps) {
-                var segment = turf.along(route.features[0], i, options);
+                let segment = turf.along(route.features[0], i, options);
                 arc.push(segment.geometry.coordinates);
             }
             
             route.features[0].geometry.coordinates = arc;
 
-            var counter = 0;
-
-            // if (movePointLayer != undefined) {
-            //     map.removeLayer('point');
-            //     map.removeSource('point');
-            //     console.log('done')
-            // }
+            let counter = 0;
 
             map.addSource('point', {
                 'type': 'geojson',
@@ -324,12 +368,14 @@
                 'source': 'point',
                 'type': 'symbol',
                 'layout': {
-                    'icon-image': 'arrow',
-                    'icon-rotate': brng,
+                    'icon-image': 'tornado',
                     'icon-rotation-alignment': 'map',
                     'icon-allow-overlap': true,
                     'icon-ignore-placement': true,
-                    'icon-size': 0.06,
+                    'icon-size': 0.1,
+                },
+                'paint': {
+                    'icon-color': '#9AD8F4'
                 }
             });
 
@@ -371,154 +417,48 @@
             }
             
             counter = counter + 1;
+
+            // console.log(movePoint.features[0].geometry.coordinates)
         }
 
-            animate(counter);
+        animate(counter);
 
         })
     });
 
-    //     movePoint = {
-    //         'type': 'FeatureCollection',
-    //         'features': [
-    //             {
-    //                 'type': 'Feature',
-    //                 'properties': {},
-    //                 'geometry': {
-    //                     'type': 'Point',
-    //                     'coordinates': startPoint
-    //                 }
-    //             }
-    //         ]
-    //     };
+    function getWindSpeed(mag) {
+        if (mag === 0) {
+            return "between 65 and 85"
+        } else if (mag === 1) {
+            return "between 86 and 110"
+        } else if (mag === 2) {
+            return "between 111 and 135"
+        } else if (mag === 3) {
+            return "between 136 and 165"
+        } else if (mag === 4) {
+            return "between 166 and 200"
+        } else if (mag === 5) {e
+            return "of more than 200"
+        } 
+    };
 
-    //     var route = {
-    //         'type': 'FeatureCollection',
-    //         'features': [
-    //             {
-    //                 'type': 'Feature',
-    //                 'geometry': {
-    //                     'type': 'LineString',
-    //                     'coordinates': [[e.features[0].properties.slon, e.features[0].properties.slat], [e.features[0].properties.elon, e.features[0].properties.elat]]
-    //             }
-    //             }
-    //         ]
-    //         };
-    //     console.log(route);
-
-    //     var options = {units: 'miles'};
-
-    //     var lineDistance = turf.distance(startPoint, endPoint, options);
-    //     console.log(lineDistance);
-
-    //     for (var i = 0; i < lineDistance; i += lineDistance / steps) {
-    //         var segment = turf.along(route.features[0], i, options);
-    //         arc.push(segment.geometry.coordinates);
-    //     }
-        
-    //     console.log(arc);
-
-    //     route.features[0].geometry.coordinates = arc;
-
-    //     var counter = 0;
-
-    //     map.addSource('point', {
-    //         'type': 'geojson',
-    //         'data': movePoint
-    //     });
-
-    //     map.addLayer({
-    //         'id': 'point',
-    //         'source': 'point',
-    //         'type': 'symbol',
-    //         'layout': {
-    //             'icon-image': 'arrow',
-    //             'icon-rotate': ['get', 'bearing'],
-    //             'icon-rotation-alignment': 'map',
-    //             'icon-allow-overlap': true,
-    //             'icon-ignore-placement': true,
-    //             'icon-size': 0.06,
-    //         }
-    //     });
-
-    //     // map.flyTo({
-    //     //     center: coordinates,
-    //     //     zoom: 10,
-    //     //     pitch: 30,
-    //     //     bearing: brng
-    //     // })
-
-    //     function animate() {
-    //     // Update point geometry to a new position based on counter denoting
-    //     // the index to access the arc.
-    //     movePoint.features[0].geometry.coordinates =
-    //     route.features[0].geometry.coordinates[counter];
-        
-    //     // Calculate the bearing to ensure the icon is rotated to match the route arc
-    //     // The bearing is calculate between the current point and the next point, except
-    //     // at the end of the arc use the previous point and the current point
-    //     movePoint.features[0].properties.bearing = turf.bearing(
-    //     turf.point(
-    //     route.features[0].geometry.coordinates[
-    //     counter >= steps ? counter - 1 : counter
-    //     ]
-    //     ),
-    //     turf.point(
-    //     route.features[0].geometry.coordinates[
-    //     counter >= steps ? counter : counter + 1
-    //     ]
-    //     )
-    //     );
-        
-    //     // Update the source with this new data.
-    //     map.getSource('point').setData(movePoint);
-        
-    //     // Request the next frame of animation so long the end has not been reached.
-    //     if (counter < steps) {
-    //     requestAnimationFrame(animate);
-    //     }
-        
-    //     counter = counter + 1;
-    // }
+    function getDamage(mag) {
+        if (mag === 0) {
+            return "light"
+        } else if (mag === 1) {
+            return "moderate"
+        } else if (mag === 2) {
+            return "considerable"
+        } else if (mag === 3) {
+            return "severe"
+        } else if (mag === 4) {
+            return "devastating"
+        } else if (mag === 5) {
+            return "incredible"
+        } 
+    };
 
 
-    //     animate(counter);
-
-    // })
-
-    
-    // function animate() {
-    //     // Update point geometry to a new position based on counter denoting
-    //     // the index to access the arc.
-    //     movePoint.features[0].geometry.coordinates =
-    //     route.features[0].geometry.coordinates[counter];
-        
-    //     // Calculate the bearing to ensure the icon is rotated to match the route arc
-    //     // The bearing is calculate between the current point and the next point, except
-    //     // at the end of the arc use the previous point and the current point
-    //     movePoint.features[0].properties.bearing = turf.bearing(
-    //     turf.point(
-    //     route.features[0].geometry.coordinates[
-    //     counter >= steps ? counter - 1 : counter
-    //     ]
-    //     ),
-    //     turf.point(
-    //     route.features[0].geometry.coordinates[
-    //     counter >= steps ? counter : counter + 1
-    //     ]
-    //     )
-    //     );
-        
-    //     // Update the source with this new data.
-    //     map.getSource('point').setData(movePoint);
-        
-    //     // Request the next frame of animation so long the end has not been reached.
-    //     if (counter < steps) {
-    //     requestAnimationFrame(animate);
-    //     }
-        
-    //     counter = counter + 1;
-    // }
 
 </script>
 
