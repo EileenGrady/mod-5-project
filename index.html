@@ -23,17 +23,27 @@
         <h1 class='txt-h2 mx36 my24 inline-block'>Tornado Damage in the US: 2010-2018</h1>
         <p class='fr mr24 mt36'>Source: <a class='link' target='_blank' href='https://www.spc.noaa.gov/gis/svrgis/'>NOAA Storm Prediction Center</a></p>
     </div>
-    <div class='col col--12 h-full relative'>
+    <div class='col col--3 h-full'>
+        <div id ='side-panel' class='txt-s my12 mx12 mb6 color-white'>
+            The US experiences an average of 1200 tornadoes every year resulting in billions of dollars in property and crop damage.
+            This map shows tornado paths in the US from 2010 to 2018. 
+            Use the time slider to explore temporal patterns, and click any tornado path for more details. 
+            Paths are symbolized according to their magnitude on the Enhanced Fujita Scale, which categorizes tornadoes according to their wind speed and related damage. 
+            This scale uses wind estimates based on damage to specific types of structure.
+             
+        </div>
+    </div>
+    <div class='col col--9 h-full relative'>
         <div id='map' class='w-full h-full'></div>
         <div id='time-slider' class='w180 bg-white absolute top left mt18 ml18 round shadow-darken10 px12 py12 txt-s'>
-                <strong class='block mb6 txt-l'><label id="year"></label></strong>
-            <input id="slider" type="range" min="2010" max="2018" step="1" value="2010" />
+            <strong class='block mb6 txt-l'><label id="month"></label></strong>
+            <input id="slider" type="range" min="0" max="11" step="1" value="0" />
         </div>
         <div id='info-box' class='w240 bg-white absolute top right mt18 mr18 round shadow-darken10 px12 py12 txt-s'>
             <strong class='block mb6 txt-l'>Click any tornado path to learn more.</strong>
         </div>
         <div id='legend' class='w180 bg-white absolute top left mt120 ml18 round shadow-darken10 px12 py12 txt-s'>
-            <strong class='block mb6 txt-m'>Enhanced Fujita Scale</strong>
+            <strong class='block mb6 txt-m'>Magnitude: Enhanced Fujita Scale</strong>
             <ul class='ul mb6'></ul>
         </div>
     </div>
@@ -43,15 +53,6 @@
 <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.1/mapbox-gl.js'></script>
 <script src="https://d3js.org/d3.v5.min.js"></script>
 <script src="https://npmcdn.com/@turf/turf/turf.min.js"></script>
-<!-- <script type="module">
-    import { MapboxGradientBoxControl, MapboxInfoBoxControl } from "/node_modules/mapbox-gl-infobox";
-</script>
-<script type="module">
-    import { Map as MapboxMap } from "/node_modules/mapbox-gl";
-</script>
-<script type="module">
-    import "/node_modules/mapbox-gl-infobox/styles.css";
-</script> -->
 
 <script>
 
@@ -66,10 +67,6 @@
         zoom: 3.52 // starting zoom
     });
 
-    // map.addControl(new mapboxgl.NavigationControl());
-
-    // map.addControl(new MapboxInfoBoxControl());
-
     // define initial bounds of map to revert to when time slider changes
     var initialBounds = [-60.29801479704621, 46.228291513703226, -137.7103744425777, 31.164291511296398]
      
@@ -83,6 +80,21 @@
         '2016',
         '2017',
         '2018'
+    ];
+
+    var months = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December'
     ];
 
     var colorCodes = {
@@ -112,6 +124,14 @@
 
     map.on('load', function() {
         d3.json('data/tornadoes-filtered.json').then(geojson => {
+
+            geojson.features = geojson.features.map(function(d) {
+                d.properties.month = new Date(d.properties.date).getMonth();
+                return d;
+            });
+
+            console.log(geojson);
+
             addLayer(geojson);
             addLegend(geojson);
         });
@@ -198,7 +218,8 @@
         });
 
         // set intial filter to 2010
-        filterBy(2010);
+        // filterBy(2010);
+        filterBy(0);
 
         document
             .getElementById('slider')
@@ -216,18 +237,21 @@
                 // revert map to initial bounds
                 map.fitBounds(initialBounds);
 
-                var year = parseInt(e.target.value);
-                filterBy(year);
+                // var year = parseInt(e.target.value);
+                // filterBy(year);
+
+                var month = parseInt(e.target.value, 10);
+                filterBy(month);
             });
     }
 
-    function filterBy(year) {
+    function filterBy(month) {
 
-        var filters = ['==', 'yr', year];
+        var filters = ['==', 'month', month];
         map.setFilter('tornado-paths', filters);
         
         // Set the label to the year
-        document.getElementById('year').textContent = year;
+        document.getElementById('month').textContent = months[month];
     }
 
     function addLegend(geojson) {
@@ -238,68 +262,58 @@
         d3.select("#legend ul").html(listItems);
     }
 
-    var steps = 90;
+    var steps = 101;
 
     map.on('click', 'tornado-paths', function(e) {
 
         let features = map.queryRenderedFeatures(e.point);
-        console.log(features);
         let props = e.features[0].properties
-        console.log(e.features[0]);
 
         let windSpeed = getWindSpeed(props.mag)
         let damage = getDamage(props.mag)
 
         let moreDetails = "<strong class='block mb6 txt-l'>Tornado Details</strong>"
-                            +"This tornado struck on " + props.date 
+                            +"<p>This tornado struck on " + props.date
+                            + " at " +props.time 
                             + " and was a magnitude EF" + props.mag 
                             + " on the Enhanced Fujita Scale. Wind speeds were " + windSpeed 
                             + " mph, causing " + damage 
                             + " damage."
-                            + "<li class='li h-full txt-s'>Property Loss: $" + e.features[0].properties.loss + " million</li>"
-                            + "<li class='li h-full txt-s'>Crop Loss: $" + props.closs + " million</li>"
+
+        if (props.loss != 0) {
+            moreDetails += "<li class='li h-full txt-s'>Property Loss: $" + e.features[0].properties.loss + " million</li>"
+        }
+        
+        if (props.closs != 0) {
+            moreDetails += "<li class='li h-full txt-s'>Crop Loss: $" + props.closs + " million</li>"
+        }
 
         document.getElementById('info-box').innerHTML=moreDetails;
 
-        let coordinates = e.features[0].geometry.coordinates;
+        let coordinates1 = e.features[0].geometry.coordinates;
+        let coordinates = [[e.features[0].properties.slon, e.features[0].properties.slat], [e.features[0].properties.elon, e.features[0].properties.elat]];
+
+        let startPoint = [e.features[0].properties.slon, e.features[0].properties.slat];
+        let endPoint = [e.features[0].properties.elon, e.features[0].properties.elat];
+
 
         
         let bounds = coordinates.reduce(function(bounds, coord) {
             return bounds.extend(coord);
         }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
 
-        // console.log(coordinates)
 
         map.fitBounds(bounds, {
             padding: {
                 'bottom': 80,
-                'left': 250,
-                'right': 300,
-                'top': 150
+                'left': 200,
+                'right': 250,
+                'top': 100
             }
         });
 
-        // let coordinates = [e.features[0].properties.slon, e.features[0].properties.slat];
-
         let turfStart = turf.point([e.features[0].properties.slon, e.features[0].properties.slat]);
         let turfEnd = turf.point([e.features[0].properties.elon, e.features[0].properties.elat]);
-
-        // let brng = turf.bearing(turfStart, turfEnd);
-
-        // let startPoint = [e.features[0].properties.slon, e.features[0].properties.slat];
-        // let endPoint = [e.features[0].properties.elon, e.features[0].properties.elat];
-
-        // let line = turf.lineString(e.features[0].geometry.coordinates)
-        // let bbox = turf.bbox(line);
-
-        // map.fitBounds(bbox, {
-            // padding: {
-            //     'bottom': 80,
-            //     'left': 250,
-            //     'right': 300,
-            //     'top': 150
-            // }
-        // });
 
         map.once('moveend', function(e) {
 
@@ -308,7 +322,20 @@
             if(typeof mapLayer !== 'undefined') {
                 // Remove map layer & source.
                 map.removeLayer('point').removeSource('point');
-            } 
+            };
+
+            var route = {
+                'type': 'FeatureCollection',
+                'features': [
+                    {
+                        'type': 'Feature',
+                        'geometry': {
+                            'type': 'LineString',
+                            'coordinates': [coordinates[0], coordinates[1]]
+                        }
+                    }
+                ]
+            };
 
             var movePoint = {
                 'type': 'FeatureCollection',
@@ -324,24 +351,8 @@
                 ]
             };
 
-            var route = {
-                'type': 'FeatureCollection',
-                'features': [
-                    {
-                        'type': 'Feature',
-                        'geometry': {
-                            'type': 'LineString',
-                            'coordinates': [coordinates[0], coordinates[1]]
-                    }
-                    }
-                ]
-                };
-
-
             let turfStart = turf.point(coordinates[0]);
             let turfEnd = turf.point(coordinates[1]);
-            // console.log(coordinates[0]);
-            // console.log(coordinates[1]);
 
             let options = {units: 'miles'};
 
@@ -379,12 +390,7 @@
                 }
             });
 
-            // map.flyTo({
-            //     center: coordinates,
-            //     zoom: 10,
-            //     pitch: 30,
-            //     bearing: brng
-            // })
+    
 
             function animate() {
             // Update point geometry to a new position based on counter denoting
@@ -392,33 +398,16 @@
             movePoint.features[0].geometry.coordinates =
             route.features[0].geometry.coordinates[counter];
             
-            // Calculate the bearing to ensure the icon is rotated to match the route arc
-            // The bearing is calculate between the current point and the next point, except
-            // at the end of the arc use the previous point and the current point
-            // movePoint.features[0].properties.bearing = turf.bearing(
-            // turf.point(
-            // route.features[0].geometry.coordinates[
-            // counter >= steps ? counter - 1 : counter
-            // ]
-            // ),
-            // turf.point(
-            // route.features[0].geometry.coordinates[
-            // counter >= steps ? counter : counter + 1
-            // ]
-            // )
-            // );
-            
             // Update the source with this new data.
             map.getSource('point').setData(movePoint);
             
             // Request the next frame of animation so long the end has not been reached.
-            if (counter < steps) {
+            if (counter < steps-1) {
                 requestAnimationFrame(animate);
             }
             
             counter = counter + 1;
 
-            // console.log(movePoint.features[0].geometry.coordinates)
         }
 
         animate(counter);
@@ -437,7 +426,7 @@
             return "between 136 and 165"
         } else if (mag === 4) {
             return "between 166 and 200"
-        } else if (mag === 5) {e
+        } else if (mag === 5) {
             return "of more than 200"
         } 
     };
