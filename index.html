@@ -20,17 +20,19 @@
 
 <div class='grid bg-gray-dark absolute h-full w-full'>
     <div class='col col--12 border-b border--white color-white'>
-        <h1 class='txt-h2 mx36 my24 inline-block'>Tornado Damage in the US: 2010-2018</h1>
+        <h1 class='txt-h2 ml12 my24 inline-block'>Tornado Damage in the US: 2010-2018</h1>
         <p class='fr mr24 mt36'>Source: <a class='link' target='_blank' href='https://www.spc.noaa.gov/gis/svrgis/'>NOAA Storm Prediction Center</a></p>
     </div>
     <div class='col col--3 h-full'>
-        <div id ='side-panel' class='txt-s my12 mx12 mb6 color-white'>
-            The US experiences an average of 1200 tornadoes every year resulting in billions of dollars in property and crop damage.
+        <div id ='side-panel' class='txt-m h-full my12 mx12 color-white'>
+            <p>The US experiences an average of 1200 tornadoes every year, resulting in billions of dollars in property and crop damage.
             This map shows tornado paths in the US from 2010 to 2018. 
-            Use the time slider to explore temporal patterns, and click any tornado path for more details. 
+            Use the time slider to explore temporal patterns throughout the year, and click any tornado path for more details. 
             Paths are symbolized according to their magnitude on the Enhanced Fujita Scale, which categorizes tornadoes according to their wind speed and related damage. 
-            This scale uses wind estimates based on damage to specific types of structure.
-             
+            This scale uses wind estimates based on damage to specific types of structure.</p>
+
+            <p class='txt-s my12 color-white'>Map authored by <a class='link' target='_blanl' href="https://eileengrady.github.io/">Eileen Grady</a>, December 2019</p>
+
         </div>
     </div>
     <div class='col col--9 h-full relative'>
@@ -69,18 +71,6 @@
 
     // define initial bounds of map to revert to when time slider changes
     var initialBounds = [-60.29801479704621, 46.228291513703226, -137.7103744425777, 31.164291511296398]
-     
-    var years = [
-        '2010',
-        '2011',
-        '2012',
-        '2013',
-        '2014',
-        '2015',
-        '2016',
-        '2017',
-        '2018'
-    ];
 
     var months = [
         'January',
@@ -129,9 +119,6 @@
                 d.properties.month = new Date(d.properties.date).getMonth();
                 return d;
             });
-
-            console.log(geojson);
-
             addLayer(geojson);
             addLegend(geojson);
         });
@@ -250,7 +237,7 @@
         var filters = ['==', 'month', month];
         map.setFilter('tornado-paths', filters);
         
-        // Set the label to the year
+        // Set the label to the month
         document.getElementById('month').textContent = months[month];
     }
 
@@ -306,8 +293,8 @@
         map.fitBounds(bounds, {
             padding: {
                 'bottom': 80,
-                'left': 200,
-                'right': 250,
+                'left': 280,
+                'right': 280,
                 'top': 100
             }
         });
@@ -446,8 +433,6 @@
             return "incredible"
         } 
     };
-
-
 
 </script>
 
