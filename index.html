@@ -31,8 +31,8 @@
             Paths are symbolized according to their magnitude on the Enhanced Fujita Scale, which categorizes tornadoes according to their wind speed and related damage. 
             This scale uses wind estimates based on damage to specific types of structure.</p>
 
-            <p class='txt-s my12 color-white'>Map authored by <a class='link' target='_blanl' href="https://eileengrady.github.io/">Eileen Grady</a>, December 2019</p>
-
+            <p class='txt-s my12 color-white'>Map authored by <a class='link' target='_blank' href="https://eileengrady.github.io/">Eileen Grady</a>, December 2019</p>
+            <p class='txt-s my12 color-white'>Tornado icon made by <a class='link' target='_blank' href="https://www.flaticon.com/authors/freepik" title="Freepik">Freepik</a> from <a class='link' target='_blank' href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></p>
         </div>
     </div>
     <div class='col col--9 h-full relative'>
@@ -110,12 +110,6 @@
 
     // define hoveredPathId to ues in hover feature state below
     var hoveredPathId = null;
-
-    // create new popup to be added below
-    var popup = new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: false
-    });
 
     // once map loads, use d3 to load geojson
     map.on('load', function() {
