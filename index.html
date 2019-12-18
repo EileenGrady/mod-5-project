@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset='utf-8' />
-  <title>Tornadoes</title>
+  <title>Tornado Damage</title>
   <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
   <link href="https://api.mapbox.com/mapbox-assembly/v0.24.0/assembly.min.css" rel="stylesheet">
   <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.1/mapbox-gl.css' rel='stylesheet' />
@@ -72,6 +72,7 @@
     // define initial bounds of map to revert to when time slider changes
     var initialBounds = [-60.29801479704621, 46.228291513703226, -137.7103744425777, 31.164291511296398]
 
+    // create array of month names to use in time slider
     var months = [
         'January',
         'February',
@@ -87,6 +88,7 @@
         'December'
     ];
 
+    // create object to hold color codes used to symbolize tornado paths
     var colorCodes = {
         0: "#85c4c9",
         1: "#fcde9c",
@@ -96,6 +98,7 @@
         5: "#7c1d6f"
     }
 
+    // create object to hold labels for legend
     var labelCodes = {
         0: "EF0",
         1: "EF1",
@@ -105,37 +108,48 @@
         5: "EF5"
     }
 
+    // define hoveredPathId to ues in hover feature state below
     var hoveredPathId = null;
 
+    // create new popup to be added below
     var popup = new mapboxgl.Popup({
         closeButton: false,
         closeOnClick: false
     });
 
+    // once map loads, use d3 to load geojson
     map.on('load', function() {
         d3.json('data/tornadoes-filtered.json').then(geojson => {
 
+            // pull out the month from the date field and enter it into new value
             geojson.features = geojson.features.map(function(d) {
                 d.properties.month = new Date(d.properties.date).getMonth();
                 return d;
             });
+
+            // once geojson is loaded, call these function
             addLayer(geojson);
             addLegend(geojson);
         });
     });
 
+
     function addLayer(geojson) {
+
+        // first add the map source, defining it as the geojson loaded above
         map.addSource('tornadoes', {
             'type': 'geojson',
             'data': geojson,
             'generateId': true
         });
 
+        // next use that data source to add a map layer
         map.addLayer({
             'id': 'tornado-paths',
             'type': 'line',
             'source': 'tornadoes', // set data source defined above
             'paint': {
+                // use mapbox expression to symbolize each line according to its magnitude
                 "line-color": [
                     "match",
                     ["number", ["get", "mag"]],
@@ -147,17 +161,19 @@
                     5, colorCodes[5],
                     "#000000"
                 ],
+                // line opacity changes based on hover
                 "line-opacity": [
                     "case",
-                    ["boolean", ["feature-state", "hover"], false],
-                    1,
-                    0.85
+                    ["boolean", ["feature-state", "hover"], false], // set to false initially
+                    1,  // when hover state is true
+                    0.85  // when hover state is false
                 ],
+                // line width changes based on hover
                 "line-width": [
                     "case",
-                    ["boolean", ["feature-state", "hover"], false],
-                    6,
-                    3
+                    ["boolean", ["feature-state", "hover"], false], // set to false initally
+                    6,  // when hover state is true
+                    3  // when hover state is false
                 ]
             },
             'layout': {
@@ -165,17 +181,22 @@
             }
         });
 
+        // load tornado icon to use in animation
         map.loadImage('images/tornado.png', function(err, image) {
             if (err) throw error;
             map.addImage('tornado', image, {
+                // set sdf to true to be able to define icon color below
                 'sdf': 'true'
             });
         });
 
+        // when the mouse moves over a tornado path
         map.on('mousemove', 'tornado-paths', function(e) {
 
+            // change the cursor to a pointer
             map.getCanvas().style.cursor = 'pointer';
 
+            // set feature state hover to true for features under pointer, and to false for all others
             if (e.features.length > 0) {
                 if (hoveredPathId) {
                     map.setFeatureState(
@@ -191,10 +212,13 @@
             }
         });
 
+        // when mouse moves out of tornado path
         map.on('mouseleave', 'tornado-paths', function() {
 
+            // revert cursor
             map.getCanvas().style.cursor = '';
-
+        
+            // revert hover feature state hover to false when mouse leaves feature
             if (hoveredPathId) {
                 map.setFeatureState(
                     { source: 'tornadoes', id: hoveredPathId },
@@ -204,10 +228,10 @@
             hoveredPathId = null;
         });
 
-        // set intial filter to 2010
-        // filterBy(2010);
+        // set intial filter on time slider to 0, or January
         filterBy(0);
 
+        // define what happens when time slider changes
         document
             .getElementById('slider')
             .addEventListener('input', function(e) {
@@ -219,14 +243,13 @@
                     map.removeLayer('point').removeSource('point');
                 }
 
+                // reset the info box to default text
                 document.getElementById('info-box').innerHTML="<strong class='block mb6 txt-l'>Click any tornado path to learn more.</strong>"
 
                 // revert map to initial bounds
                 map.fitBounds(initialBounds);
 
-                // var year = parseInt(e.target.value);
-                // filterBy(year);
-
+                // call function filter to filter tornado paths based on the time slider input
                 var month = parseInt(e.target.value, 10);
                 filterBy(month);
             });
@@ -234,31 +257,46 @@
 
     function filterBy(month) {
 
+        // define a filter where the month field in the data equals the month in the time slider
         var filters = ['==', 'month', month];
+
+        // apply the filter to the map
         map.setFilter('tornado-paths', filters);
         
-        // Set the label to the month
+        // set the time slider label to the month
         document.getElementById('month').textContent = months[month];
     }
 
+    // define function to add legend
     function addLegend(geojson) {
+
+        // create empty item to hold listItems
         var listItems = '';
+
+        // loop through each color in the color codes and add that color and its label to the empty listItems
         for(var code in colorCodes) {
             listItems += "<li class='li h-full txt-m'><span class='w24 h18 mt6 fl mr12' style='background:" + colorCodes[code] +"'></span>" + labelCodes[code] + "</li>"
         }
+
+        // then select the legend and update it to hold the list, or legend items
         d3.select("#legend ul").html(listItems);
     }
 
+    // define number of steps to use in the "Animate a point along a route" example
     var steps = 101;
 
+    // when user clicks on a tornado path, this code block will run
     map.on('click', 'tornado-paths', function(e) {
 
+        // get the feature clicked on
         let features = map.queryRenderedFeatures(e.point);
         let props = e.features[0].properties
 
+        // determine the wind speed and amount of damage based on the feature's magnitude
         let windSpeed = getWindSpeed(props.mag)
         let damage = getDamage(props.mag)
 
+        // define info-box content based on each tornado
         let moreDetails = "<strong class='block mb6 txt-l'>Tornado Details</strong>"
                             +"<p>This tornado struck on " + props.date
                             + " at " +props.time 
@@ -267,29 +305,28 @@
                             + " mph, causing " + damage 
                             + " damage."
 
+        // only add property and crop loss information if those values are not 0.                        
         if (props.loss != 0) {
             moreDetails += "<li class='li h-full txt-s'>Property Loss: $" + e.features[0].properties.loss + " million</li>"
-        }
+        };
         
         if (props.closs != 0) {
             moreDetails += "<li class='li h-full txt-s'>Crop Loss: $" + props.closs + " million</li>"
-        }
+        };
 
+        // grab the info-box and update its contents with the tornado details
         document.getElementById('info-box').innerHTML=moreDetails;
 
-        let coordinates1 = e.features[0].geometry.coordinates;
+        //define coordinates as the starting and ending points of the line feature
         let coordinates = [[e.features[0].properties.slon, e.features[0].properties.slat], [e.features[0].properties.elon, e.features[0].properties.elat]];
 
-        let startPoint = [e.features[0].properties.slon, e.features[0].properties.slat];
-        let endPoint = [e.features[0].properties.elon, e.features[0].properties.elat];
-
-
-        
+        // find bounds of tornado path clicked on, 
+        // passing the coordinates and wrapping each coordinate pair in extend to include in bound result
         let bounds = coordinates.reduce(function(bounds, coord) {
             return bounds.extend(coord);
         }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
 
-
+        // fit map to those bounds of the line string
         map.fitBounds(bounds, {
             padding: {
                 'bottom': 80,
@@ -299,18 +336,18 @@
             }
         });
 
-        let turfStart = turf.point([e.features[0].properties.slon, e.features[0].properties.slat]);
-        let turfEnd = turf.point([e.features[0].properties.elon, e.features[0].properties.elat]);
-
+        // then, once the map finishes fitting to the bounds of the line string, prepare to animate tornado icon
+        // using .once so that the animation doesn't continue to replay if user zooms or pans away
         map.once('moveend', function(e) {
 
+            //first check to see if the tornado icon has already been added to map, and remove if so
             let mapLayer = map.getLayer('point');
-
             if(typeof mapLayer !== 'undefined') {
                 // Remove map layer & source.
                 map.removeLayer('point').removeSource('point');
             };
 
+            // create a line using the beginning and ending of tornado path
             var route = {
                 'type': 'FeatureCollection',
                 'features': [
@@ -324,6 +361,7 @@
                 ]
             };
 
+            // create the point to animate along the route
             var movePoint = {
                 'type': 'FeatureCollection',
                 'features': [
@@ -338,29 +376,40 @@
                 ]
             };
 
+            // define turf points for the beginning and end of the tornado path clicked on
+            // so we can find distance between them using turf
             let turfStart = turf.point(coordinates[0]);
             let turfEnd = turf.point(coordinates[1]);
 
             let options = {units: 'miles'};
 
+            // define empty array to hold arc segments
             let arc = [];
 
+            // find distance between points
             let lineDistance = turf.distance(turfStart, turfEnd, options);
 
+            // draw arc between the start and ending points
+            // creating segments along the route based on the number of steps defined above
+            // then pushing each coordinate to the arc array
             for (var i = 0; i < lineDistance; i += lineDistance / steps) {
                 let segment = turf.along(route.features[0], i, options);
                 arc.push(segment.geometry.coordinates);
             }
             
+            // update the route geometry with the coordinates array now contained in the arc
             route.features[0].geometry.coordinates = arc;
 
+            // start the counter at 0
             let counter = 0;
 
+            //add point source to use for the animated icon
             map.addSource('point', {
                 'type': 'geojson',
                 'data': movePoint
             });
 
+            //add the tornado icon to be animated
             map.addLayer({
                 'id': 'point',
                 'source': 'point',
@@ -380,28 +429,30 @@
     
 
             function animate() {
-            // Update point geometry to a new position based on counter denoting
-            // the index to access the arc.
+            // update point geometry to a new position based on counter denoting index to access arc
             movePoint.features[0].geometry.coordinates =
             route.features[0].geometry.coordinates[counter];
             
-            // Update the source with this new data.
+            // update the source with this new coordinate location
             map.getSource('point').setData(movePoint);
             
-            // Request the next frame of animation so long the end has not been reached.
+            // request the next frame of animation as long as the end hasn't been reached
             if (counter < steps-1) {
                 requestAnimationFrame(animate);
             }
             
+            // increment the counter
             counter = counter + 1;
 
         }
 
+        // call the function
         animate(counter);
 
         })
     });
 
+    // define function to find wind speed based on magnitude to populate tornado details
     function getWindSpeed(mag) {
         if (mag === 0) {
             return "between 65 and 85"
@@ -418,6 +469,7 @@
         } 
     };
 
+    // define function to find damage description based on magnitude to populate tornado details
     function getDamage(mag) {
         if (mag === 0) {
             return "light"
